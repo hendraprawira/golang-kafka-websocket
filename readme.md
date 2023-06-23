@@ -4,7 +4,7 @@ how to run producer
 ```bash
 go run producer/producer.go
 ```
-how to run producer
+how to run consumer
 ```bash
 go run consumer/consumer.go
 ```
