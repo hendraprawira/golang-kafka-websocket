@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -30,7 +31,7 @@ func SendUserToKafka(producer sarama.SyncProducer, user []byte) error {
 	// 	log.Println("Error marshaling data kafka:", err)
 	// }
 	msg := &sarama.ProducerMessage{
-		Topic:     "ownship",
+		Topic:     "ahkamu",
 		Value:     sarama.StringEncoder(user),
 		Timestamp: time.Now(),
 	}
@@ -42,14 +43,19 @@ func SendUserToKafka(producer sarama.SyncProducer, user []byte) error {
 
 func StartKafkaConsumer() error {
 	// Create Kafka consumer
+	config := sarama.NewConfig()
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	topic := os.Getenv("TOPIC_BROKER")
+	kafkaHost := os.Getenv("KAFKA_HOST")
+	kafkaGroupID := os.Getenv("KAFKA_GROUP_ID")
 
-	consumer, err := sarama.NewClient([]string{"localhost:9092"}, nil)
+	consumer, err := sarama.NewClient([]string{kafkaHost}, nil)
 	if err != nil {
 		log.Fatalf("Failed to create Kafka consumer: %s", err)
 	}
 	defer consumer.Close()
 
-	group, err := sarama.NewConsumerGroupFromClient("your", consumer)
+	group, err := sarama.NewConsumerGroupFromClient(kafkaGroupID, consumer)
 	if err != nil {
 		return err
 	}
@@ -71,7 +77,7 @@ func StartKafkaConsumer() error {
 	go func() {
 		defer wg.Done()
 		for {
-			err := group.Consume(ctx, []string{"ownship"}, handler)
+			err := group.Consume(ctx, []string{topic}, handler)
 			if err != nil {
 				log.Printf("Error from consumer: %v", err)
 			}

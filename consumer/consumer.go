@@ -1,19 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net/http"
 
-	"golang-kafka-sarama-gorm/db"
 	kafkaGo "golang-kafka-sarama-gorm/kafka"
-	"golang-kafka-sarama-gorm/models"
+	websocketGo "golang-kafka-sarama-gorm/websocket"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Println(err)
+	}
 	// Set up Gin router
-	db.ConnectMemcached()
 	router := gin.Default()
 
 	// Start the Kafka consumer in the background
@@ -25,29 +29,39 @@ func main() {
 	}()
 
 	// Define a route handler for handling HTTP requests
-	router.GET("/consume", func(c *gin.Context) {
-		// Perform any desired actions when a request is received
-		var data models.Tracking
 
-		// Try to fetch data from Memcached
-		item, err := db.MC.Get("1")
-		if err == nil {
-			// Data found in Memcached, unmarshal it
-			log.Print(string(item.Value))
-			// err = json.Unmarshal(item.Value, &data)
-			// if err != nil {
-			// 	log.Println("Error unmarshaling data from Memcached:", err)
-			// 	c.JSON(http.StatusBadRequest, data)
-			// }
-		} else {
-			log.Println("Error fetching data from Memcached:", err)
-			c.JSON(http.StatusBadRequest, data)
+	router.GET("/webSocket", func(c *gin.Context) {
+		conn, err := websocketGo.Upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Println("Failed to upgrade WebSocket connection:", err)
+			return
 		}
-		c.JSON(http.StatusOK, data.AccelarationX)
+		defer conn.Close()
+
+		websocketGo.GlobalWebSocketCon = conn // Store the connection globally
+
+		for {
+			// Read message from WebSocket
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				log.Println("Failed to read message from WebSocket:", err)
+				break
+			}
+
+			log.Println("Received message from WebSocket:", string(message))
+
+			// Send a response back to the WebSocket client
+			response := []byte("Received your message: " + string(message))
+			err = conn.WriteMessage(websocket.TextMessage, response)
+			if err != nil {
+				log.Println("Failed to send response to WebSocket:", err)
+				break
+			}
+		}
 	})
 
 	// Start the Gin server
-	if err := router.Run(":8000"); err != nil {
+	if err := router.Run(":8081"); err != nil {
 		log.Fatalf("Failed to start server: %s", err)
 	}
 
