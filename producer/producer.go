@@ -48,6 +48,6 @@ func main() {
 
 	// Start the Gin server
 	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("Failed to start server: %s", err)
+		log.Fatalf("Failed to start servers: %s", err)
 	}
 }
